@@ -18,7 +18,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
 // ROOT
 // ─────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.send("✅ Expense Tracker API Running");
+  res.send(" Expense Tracker API Running");
 });
 
 // ─────────────────────────────────────────
@@ -293,5 +293,5 @@ app.get("/report", auth, async (req, res) => {
 // ─────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(` Server running on port ${PORT}`);
 });

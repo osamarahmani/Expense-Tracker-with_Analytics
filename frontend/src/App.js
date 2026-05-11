@@ -3,7 +3,7 @@ import Charts from "./Charts";
 import Budget from "./Budget";
 
 function App() {
-  const API = "http://localhost:5000";
+  const API = "https://expense-tracker-with-analytics-6iox.onrender.com"; 
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -216,7 +216,7 @@ function App() {
         {/* HEADER */}
         <div style={s.header}>
           <div>
-            <h1 style={s.headerTitle}>💰 Expense Tracker</h1>
+            <h1 style={s.headerTitle}> Expense Tracker</h1>
             {isLoggedIn && (
               <div style={{ fontSize: "13px", opacity: 0.75, marginTop: "4px" }}>
                 Welcome back, {loggedUser}!
@@ -247,7 +247,7 @@ function App() {
         {/* AUTH SECTION */}
         {!isLoggedIn && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}>🔐 Register / Login</h3>
+            <h3 style={s.cardTitle}> Register / Login</h3>
             <div style={s.inputRow}>
               <input style={s.input} placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
               <input style={s.input} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -263,7 +263,7 @@ function App() {
         {/* TRANSACTION FORM */}
         {isLoggedIn && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}>{editId ? "✏️ Update Transaction" : "➕ Add Transaction"}</h3>
+            <h3 style={s.cardTitle}>{editId ? " Update Transaction" : " Add Transaction"}</h3>
             <div style={s.typeRow}>
               <button style={s.typeBtn(type === "income", "#11998e")} onClick={() => setType("income")}>⬆️ Income</button>
               <button style={s.typeBtn(type === "expense", "#eb3349")} onClick={() => setType("expense")}>⬇️ Expense</button>
@@ -288,7 +288,7 @@ function App() {
         {/* TRANSACTIONS LIST + ANALYTICS + BUDGET */}
         {isLoggedIn && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}>📋 Transactions</h3>
+            <h3 style={s.cardTitle}> Transactions</h3>
 
             {/* TABS */}
             <div style={s.tabs}>
@@ -302,10 +302,10 @@ function App() {
                 Expense ({data.filter(d => d.type === "expense").length})
               </button>
               <button style={s.tab(activeTab === "analytics")} onClick={() => setActiveTab("analytics")}>
-                📊 Analytics
+                 Analytics
               </button>
               <button style={s.tab(activeTab === "budget")} onClick={() => setActiveTab("budget")}>
-                🎯 Budget
+                 Budget
               </button>
             </div>
 
@@ -330,7 +330,7 @@ function App() {
                   <div key={item.id} style={s.txItem}>
                     <div style={s.txLeft}>
                       <div style={s.txIcon(item.type)}>
-                        {item.type === "income" ? "⬆️" : "⬇️"}
+                        {item.type === "income" ? "⬆" : "⬇"}
                       </div>
                       <div>
                         <div style={s.txTitle}>{item.title}</div>
@@ -362,3 +362,5 @@ function App() {
 }
 
 export default App;
+
+

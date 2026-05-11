@@ -129,7 +129,7 @@ export default function Budget({ token }) {
       {/* ALERTS */}
       {alerts.length > 0 && (
         <div style={cardStyle}>
-          <h3 style={titleStyle}>🚨 Budget Alerts</h3>
+          <h3 style={titleStyle}> Budget Alerts</h3>
           {alerts.map(alert => (
             <div key={alert.category} style={{
               padding: "14px 16px", borderRadius: "10px",
@@ -154,8 +154,8 @@ export default function Budget({ token }) {
               </div>
               <div style={{ fontSize: "12px", color: "#888", marginTop: "4px" }}>
                 {alert.exceeded
-                  ? `⚠️ Budget exceeded by ₹${(alert.spent - alert.limit).toFixed(2)}`
-                  : `⚠️ ${((alert.spent / alert.limit) * 100).toFixed(0)}% of budget used`
+                  ? ` Budget exceeded by ₹${(alert.spent - alert.limit).toFixed(2)}`
+                  : ` ${((alert.spent / alert.limit) * 100).toFixed(0)}% of budget used`
                 }
               </div>
             </div>
