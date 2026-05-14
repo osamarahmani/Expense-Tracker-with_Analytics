@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 require("dotenv").config();
 
 const pool = require("./db");
@@ -13,12 +14,13 @@ app.use(cors());
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
+const client = new OAuth2Client("391774840730-khdjdtvg18ql8iaaekj7lbfk0dh7dsho.apps.googleusercontent.com");
 
 // ─────────────────────────────────────────
 // ROOT
 // ─────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.send(" Expense Tracker API Running");
+  res.send("Expense Tracker API Running");
 });
 
 // ─────────────────────────────────────────
@@ -98,6 +100,50 @@ app.post("/login", async (req, res) => {
 });
 
 // ─────────────────────────────────────────
+// GOOGLE LOGIN
+// ─────────────────────────────────────────
+app.post("/google-login", async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: "391774840730-khdjdtvg18ql8iaaekj7lbfk0dh7dsho.apps.googleusercontent.com",
+    });
+
+    const { name, email, sub: googleId } = ticket.getPayload();
+
+    let result = await pool.query(
+      "SELECT * FROM users WHERE email = $1", [email]
+    );
+
+    if (result.rows.length === 0) {
+      result = await pool.query(
+        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
+        [name, email, `google_${googleId}`]
+      );
+    }
+
+    const user = result.rows[0];
+
+    const token2 = jwt.sign(
+      { id: user.id, name: user.name, email: user.email },
+      JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      token: token2,
+      user: { id: user.id, name: user.name, email: user.email },
+    });
+
+  } catch (err) {
+    console.error("GOOGLE LOGIN ERROR:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────
 // ADD TRANSACTION
 // ─────────────────────────────────────────
 app.post("/add", auth, async (req, res) => {
@@ -117,9 +163,8 @@ app.post("/add", auth, async (req, res) => {
       return res.status(400).json({ error: "Type must be income or expense" });
     }
 
-    // Income positive, expense negative
-    const finalAmount = type === "income" 
-      ? Math.abs(parseFloat(amount)) 
+    const finalAmount = type === "income"
+      ? Math.abs(parseFloat(amount))
       : -Math.abs(parseFloat(amount));
 
     const result = await pool.query(
@@ -161,19 +206,16 @@ app.get("/balance", auth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Total balance
     const balanceResult = await pool.query(
       "SELECT COALESCE(SUM(amount), 0) AS balance FROM transactions WHERE user_id = $1",
       [userId]
     );
 
-    // Total income
     const incomeResult = await pool.query(
       "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = $1 AND type = 'income'",
       [userId]
     );
 
-    // Total expense
     const expenseResult = await pool.query(
       "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = $1 AND type = 'expense'",
       [userId]
@@ -293,5 +335,5 @@ app.get("/report", auth, async (req, res) => {
 // ─────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(` Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

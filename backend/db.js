@@ -2,11 +2,14 @@ const { Pool } = require("pg");
 require("dotenv").config();
 
 const pool = new Pool({
-  user: process.env.DB_USER || "postgres",
-  host: process.env.DB_HOST || "localhost",
-  database: process.env.DB_NAME || "expense_tracker",
-  password: process.env.DB_PASSWORD || "1234",
-  port: process.env.DB_PORT || 5432,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 pool.connect((err, client, release) => {
@@ -28,7 +31,6 @@ const createTables = async () => {
         password TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-
       CREATE TABLE IF NOT EXISTS transactions (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),
@@ -38,7 +40,6 @@ const createTables = async () => {
         category VARCHAR(50),
         created_at TIMESTAMP DEFAULT NOW()
       );
-
       CREATE TABLE IF NOT EXISTS budgets (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id),

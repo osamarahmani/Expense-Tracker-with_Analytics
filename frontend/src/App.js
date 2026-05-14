@@ -1,3 +1,4 @@
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useState, useEffect } from "react";
 import Charts from "./Charts";
 import Budget from "./Budget";
@@ -65,6 +66,28 @@ function App() {
       }
     } catch (err) {
       alert("Login Failed. Is the server running?");
+    }
+  };
+
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      const res = await fetch(`${API}/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: credentialResponse.credential }),
+      });
+      const result = await res.json();
+      if (result.token) {
+        localStorage.setItem("token", result.token);
+        setIsLoggedIn(true);
+        setLoggedUser(result.user?.name);
+        getData();
+        getBalance();
+      } else {
+        alert(result.error || "Google Login Failed");
+      }
+    } catch (err) {
+      alert("Google Login Failed. Is the server running?");
     }
   };
 
@@ -247,7 +270,7 @@ function App() {
         {/* AUTH SECTION */}
         {!isLoggedIn && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}> Register / Login</h3>
+            <h3 style={s.cardTitle}>🔐 Register / Login</h3>
             <div style={s.inputRow}>
               <input style={s.input} placeholder="Full Name" value={name} onChange={(e) => setName(e.target.value)} />
               <input style={s.input} placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -257,13 +280,25 @@ function App() {
             </div>
             <button style={s.btn("#38a169")} onClick={register}>Register</button>
             <button style={s.btn("#667eea")} onClick={login}>Login</button>
+
+            {/* ✅ GOOGLE LOGIN - இங்க ADD பண்ணினோம் */}
+            <div style={{ marginTop: "20px", textAlign: "center" }}>
+              <p style={{ color: "#888", marginBottom: "12px", fontSize: "14px" }}>--- OR ---</p>
+              <GoogleOAuthProvider clientId="391774840730-khdjdtvg18ql8iaaekj7lbfk0dh7dsho.apps.googleusercontent.com">
+                <GoogleLogin
+                  onSuccess={handleGoogleLogin}
+                  onError={() => alert("Google Login Failed")}
+                />
+              </GoogleOAuthProvider>
+            </div>
+
           </div>
         )}
 
         {/* TRANSACTION FORM */}
         {isLoggedIn && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}>{editId ? " Update Transaction" : " Add Transaction"}</h3>
+            <h3 style={s.cardTitle}>{editId ? "✏️ Update Transaction" : "➕ Add Transaction"}</h3>
             <div style={s.typeRow}>
               <button style={s.typeBtn(type === "income", "#11998e")} onClick={() => setType("income")}>⬆️ Income</button>
               <button style={s.typeBtn(type === "expense", "#eb3349")} onClick={() => setType("expense")}>⬇️ Expense</button>
@@ -288,38 +323,16 @@ function App() {
         {/* TRANSACTIONS LIST + ANALYTICS + BUDGET */}
         {isLoggedIn && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}> Transactions</h3>
-
-            {/* TABS */}
+            <h3 style={s.cardTitle}>📋 Transactions</h3>
             <div style={s.tabs}>
-              <button style={s.tab(activeTab === "all")} onClick={() => setActiveTab("all")}>
-                All ({data.length})
-              </button>
-              <button style={s.tab(activeTab === "income")} onClick={() => setActiveTab("income")}>
-                Income ({data.filter(d => d.type === "income").length})
-              </button>
-              <button style={s.tab(activeTab === "expense")} onClick={() => setActiveTab("expense")}>
-                Expense ({data.filter(d => d.type === "expense").length})
-              </button>
-              <button style={s.tab(activeTab === "analytics")} onClick={() => setActiveTab("analytics")}>
-                 Analytics
-              </button>
-              <button style={s.tab(activeTab === "budget")} onClick={() => setActiveTab("budget")}>
-                 Budget
-              </button>
+              <button style={s.tab(activeTab === "all")} onClick={() => setActiveTab("all")}>All ({data.length})</button>
+              <button style={s.tab(activeTab === "income")} onClick={() => setActiveTab("income")}>Income ({data.filter(d => d.type === "income").length})</button>
+              <button style={s.tab(activeTab === "expense")} onClick={() => setActiveTab("expense")}>Expense ({data.filter(d => d.type === "expense").length})</button>
+              <button style={s.tab(activeTab === "analytics")} onClick={() => setActiveTab("analytics")}>📊 Analytics</button>
+              <button style={s.tab(activeTab === "budget")} onClick={() => setActiveTab("budget")}>🎯 Budget</button>
             </div>
-
-            {/* ANALYTICS TAB */}
-            {activeTab === "analytics" && (
-              <Charts token={localStorage.getItem("token")} />
-            )}
-
-            {/* BUDGET TAB */}
-            {activeTab === "budget" && (
-              <Budget token={localStorage.getItem("token")} />
-            )}
-
-            {/* TRANSACTIONS LIST */}
+            {activeTab === "analytics" && <Charts token={localStorage.getItem("token")} />}
+            {activeTab === "budget" && <Budget token={localStorage.getItem("token")} />}
             {activeTab !== "analytics" && activeTab !== "budget" && (
               <>
                 {loading && <p style={{ color: "#888", textAlign: "center" }}>Loading...</p>}
@@ -362,5 +375,3 @@ function App() {
 }
 
 export default App;
-
-
