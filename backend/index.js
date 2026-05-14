@@ -10,11 +10,24 @@ const auth = require("./middleware/auth");
 
 const app = express();
 
-app.use(cors());
+// ✅ CORS FIX
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "https://transcendent-jalebi-65024d.netlify.app"
+  ],
+  credentials: true
+}));
+
 app.use(express.json());
 
 const JWT_SECRET = process.env.JWT_SECRET || "secretkey";
-const client = new OAuth2Client("391774840730-khdjdtvg18ql8iaaekj7lbfk0dh7dsho.apps.googleusercontent.com");
+
+// ✅ GOOGLE CLIENT ID
+const GOOGLE_CLIENT_ID =
+  "391774840730-khdjdtvg18ql8iaaekj7lbfk0dh7dsho.apps.googleusercontent.com";
+
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // ─────────────────────────────────────────
 // ROOT
@@ -38,6 +51,7 @@ app.post("/register", async (req, res) => {
       "SELECT id FROM users WHERE email = $1",
       [email]
     );
+
     if (existing.rows.length > 0) {
       return res.status(400).json({ error: "Email already registered" });
     }
@@ -45,11 +59,12 @@ app.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
-      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3)",
+      "INSERT INTO users (name, email, password) VALUES ($1,$2,$3)",
       [name, email, hashedPassword]
     );
 
     res.status(201).json({ message: "User Registered Successfully" });
+
   } catch (err) {
     console.error("REGISTER ERROR:", err.message);
     res.status(500).json({ error: err.message });
@@ -63,36 +78,38 @@ app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ error: "User not found" });
     }
 
     const user = result.rows[0];
 
     const isMatch = await bcrypt.compare(password, user.password);
+
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ error: "Invalid password" });
     }
 
     const token = jwt.sign(
-      { id: user.id, name: user.name, email: user.email },
+      { id: user.id, email: user.email, name: user.name },
       JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     res.json({
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
     });
+
   } catch (err) {
     console.error("LOGIN ERROR:", err.message);
     res.status(500).json({ error: err.message });
@@ -106,40 +123,55 @@ app.post("/google-login", async (req, res) => {
   try {
     const { token } = req.body;
 
+    if (!token) {
+      return res.status(400).json({ error: "Token missing" });
+    }
+
     const ticket = await client.verifyIdToken({
       idToken: token,
-      audience: "391774840730-khdjdtvg18ql8iaaekj7lbfk0dh7dsho.apps.googleusercontent.com",
+      audience: GOOGLE_CLIENT_ID
     });
 
-    const { name, email, sub: googleId } = ticket.getPayload();
+    const payload = ticket.getPayload();
+
+    const name = payload.name;
+    const email = payload.email;
+    const googleId = payload.sub;
 
     let result = await pool.query(
-      "SELECT * FROM users WHERE email = $1", [email]
+      "SELECT * FROM users WHERE email = $1",
+      [email]
     );
 
     if (result.rows.length === 0) {
       result = await pool.query(
-        "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING *",
-        [name, email, `google_${googleId}`]
+        "INSERT INTO users (name,email,password) VALUES ($1,$2,$3) RETURNING *",
+        [name, email, "google_" + googleId]
       );
     }
 
     const user = result.rows[0];
 
-    const token2 = jwt.sign(
-      { id: user.id, name: user.name, email: user.email },
+    const jwtToken = jwt.sign(
+      { id: user.id, email: user.email, name: user.name },
       JWT_SECRET,
       { expiresIn: "1d" }
     );
 
     res.json({
-      token: token2,
-      user: { id: user.id, name: user.name, email: user.email },
+      token: jwtToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
     });
 
   } catch (err) {
     console.error("GOOGLE LOGIN ERROR:", err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({
+      error: "Google login failed"
+    });
   }
 });
 
@@ -151,29 +183,24 @@ app.post("/add", auth, async (req, res) => {
     const { title, amount, category, type } = req.body;
     const userId = req.user.id;
 
-    if (!title || !amount || !category || !type) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
-
-    if (isNaN(amount)) {
-      return res.status(400).json({ error: "Amount must be a number" });
-    }
-
-    if (type !== "income" && type !== "expense") {
-      return res.status(400).json({ error: "Type must be income or expense" });
-    }
-
-    const finalAmount = type === "income"
-      ? Math.abs(parseFloat(amount))
-      : -Math.abs(parseFloat(amount));
+    const finalAmount =
+      type === "income"
+        ? Math.abs(Number(amount))
+        : -Math.abs(Number(amount));
 
     const result = await pool.query(
-      `INSERT INTO transactions (title, amount, category, type, user_id)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      `INSERT INTO transactions
+      (title,amount,category,type,user_id)
+      VALUES ($1,$2,$3,$4,$5)
+      RETURNING *`,
       [title, finalAmount, category, type, userId]
     );
 
-    res.status(201).json({ message: "Transaction Added", data: result.rows[0] });
+    res.json({
+      message: "Transaction Added",
+      data: result.rows[0]
+    });
+
   } catch (err) {
     console.error("ADD ERROR:", err.message);
     res.status(500).json({ error: err.message });
@@ -181,51 +208,53 @@ app.post("/add", auth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// GET ALL TRANSACTIONS
+// GET ALL
 // ─────────────────────────────────────────
 app.get("/all", auth, async (req, res) => {
   try {
     const userId = req.user.id;
 
     const result = await pool.query(
-      "SELECT * FROM transactions WHERE user_id = $1 ORDER BY id DESC",
+      "SELECT * FROM transactions WHERE user_id=$1 ORDER BY id DESC",
       [userId]
     );
 
     res.json(result.rows);
+
   } catch (err) {
-    console.error("GET ALL ERROR:", err.message);
+    console.error("GET ERROR:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ─────────────────────────────────────────
-// GET BALANCE
+// BALANCE
 // ─────────────────────────────────────────
 app.get("/balance", auth, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const balanceResult = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) AS balance FROM transactions WHERE user_id = $1",
+    const balance = await pool.query(
+      "SELECT COALESCE(SUM(amount),0) total FROM transactions WHERE user_id=$1",
       [userId]
     );
 
-    const incomeResult = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = $1 AND type = 'income'",
+    const income = await pool.query(
+      "SELECT COALESCE(SUM(amount),0) total FROM transactions WHERE user_id=$1 AND type='income'",
       [userId]
     );
 
-    const expenseResult = await pool.query(
-      "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = $1 AND type = 'expense'",
+    const expense = await pool.query(
+      "SELECT COALESCE(SUM(amount),0) total FROM transactions WHERE user_id=$1 AND type='expense'",
       [userId]
     );
 
     res.json({
-      balance: parseFloat(balanceResult.rows[0].balance).toFixed(2),
-      income: parseFloat(incomeResult.rows[0].total).toFixed(2),
-      expense: Math.abs(parseFloat(expenseResult.rows[0].total)).toFixed(2),
+      balance: Number(balance.rows[0].total),
+      income: Number(income.rows[0].total),
+      expense: Math.abs(Number(expense.rows[0].total))
     });
+
   } catch (err) {
     console.error("BALANCE ERROR:", err.message);
     res.status(500).json({ error: err.message });
@@ -233,99 +262,22 @@ app.get("/balance", auth, async (req, res) => {
 });
 
 // ─────────────────────────────────────────
-// UPDATE TRANSACTION
-// ─────────────────────────────────────────
-app.put("/update/:id", auth, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const userId = req.user.id;
-    const { title, amount, category, type } = req.body;
-
-    if (!title || !amount || !category || !type) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
-
-    if (type !== "income" && type !== "expense") {
-      return res.status(400).json({ error: "Type must be income or expense" });
-    }
-
-    const check = await pool.query(
-      "SELECT id FROM transactions WHERE id = $1 AND user_id = $2",
-      [id, userId]
-    );
-    if (check.rows.length === 0) {
-      return res.status(404).json({ error: "Transaction not found" });
-    }
-
-    const finalAmount = type === "income"
-      ? Math.abs(parseFloat(amount))
-      : -Math.abs(parseFloat(amount));
-
-    const result = await pool.query(
-      `UPDATE transactions
-       SET title = $1, amount = $2, category = $3, type = $4
-       WHERE id = $5 AND user_id = $6
-       RETURNING *`,
-      [title, finalAmount, category, type, id, userId]
-    );
-
-    res.json({ message: "Transaction Updated", data: result.rows[0] });
-  } catch (err) {
-    console.error("UPDATE ERROR:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────
-// DELETE TRANSACTION
+// DELETE
 // ─────────────────────────────────────────
 app.delete("/delete/:id", auth, async (req, res) => {
   try {
     const id = req.params.id;
     const userId = req.user.id;
 
-    const check = await pool.query(
-      "SELECT id FROM transactions WHERE id = $1 AND user_id = $2",
-      [id, userId]
-    );
-    if (check.rows.length === 0) {
-      return res.status(404).json({ error: "Transaction not found" });
-    }
-
     await pool.query(
-      "DELETE FROM transactions WHERE id = $1 AND user_id = $2",
+      "DELETE FROM transactions WHERE id=$1 AND user_id=$2",
       [id, userId]
     );
 
-    res.json({ message: "Transaction Deleted" });
+    res.json({ message: "Deleted Successfully" });
+
   } catch (err) {
     console.error("DELETE ERROR:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ─────────────────────────────────────────
-// MONTHLY REPORT
-// ─────────────────────────────────────────
-app.get("/report", auth, async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const { month, year } = req.query;
-
-    const result = await pool.query(
-      `SELECT category, type, SUM(ABS(amount)) AS total
-       FROM transactions
-       WHERE user_id = $1
-         AND EXTRACT(MONTH FROM created_at) = $2
-         AND EXTRACT(YEAR FROM created_at) = $3
-       GROUP BY category, type
-       ORDER BY total DESC`,
-      [userId, month, year]
-    );
-
-    res.json(result.rows);
-  } catch (err) {
-    console.error("REPORT ERROR:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -334,6 +286,7 @@ app.get("/report", auth, async (req, res) => {
 // START SERVER
 // ─────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
