@@ -1,10 +1,11 @@
+import API from "./config";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useState, useEffect } from "react";
 import Charts from "./Charts";
 import Budget from "./Budget";
 
 function App() {
-  const API = "https://expense-tracker-with-analytics-6iox.onrender.com"; 
+ 
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
