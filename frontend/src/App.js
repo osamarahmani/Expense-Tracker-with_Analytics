@@ -5,7 +5,7 @@ import Charts from "./Charts";
 import Budget from "./Budget";
 
 function App() {
-  const API = "https://expense-tracker-with-analytics-6iox.onrender.com"; 
+  
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -18,6 +18,7 @@ function App() {
   const [category, setCategory] = useState("");
   const [type, setType] = useState("expense");
   const [editId, setEditId] = useState(null);
+  
 
   const [data, setData] = useState([]);
   const [balance, setBalance] = useState(0);
