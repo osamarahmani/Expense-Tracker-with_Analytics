@@ -18,7 +18,7 @@ function App() {
   const [category, setCategory] = useState("");
   const [type, setType] = useState("expense");
   const [editId, setEditId] = useState(null);
-  
+
 
   const [data, setData] = useState([]);
   const [balance, setBalance] = useState(0);
@@ -127,9 +127,9 @@ function App() {
         headers: { Authorization: localStorage.getItem("token") },
       });
       const result = await res.json();
-      setBalance(result.balance || 0);
-      setIncome(result.income || 0);
-      setExpense(result.expense || 0);
+      setBalance(result?.balance || 0);
+      setIncome(result?.income || 0);
+      setExpense(result?.expense || 0);
     } catch (err) {
       console.error(err);
     }
